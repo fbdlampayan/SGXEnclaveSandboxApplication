@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SandboxApplication", "SandboxApplication\SandboxApplication.vcxproj", "{A4B68612-2BAF-45CE-9E01-C3D5B694F5F5}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SandboxEnclave", "..\SandboxEnclave\SandboxEnclave\SandboxEnclave.vcxproj", "{65DEA2D3-7DE1-4C70-A739-DDBCBFFF0BE4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Prerelease|Win32 = Prerelease|Win32
+		Release|Win32 = Release|Win32
+		Simulation|Win32 = Simulation|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A4B68612-2BAF-45CE-9E01-C3D5B694F5F5}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A4B68612-2BAF-45CE-9E01-C3D5B694F5F5}.Debug|Win32.Build.0 = Debug|Win32
+		{A4B68612-2BAF-45CE-9E01-C3D5B694F5F5}.Prerelease|Win32.ActiveCfg = Release|Win32
+		{A4B68612-2BAF-45CE-9E01-C3D5B694F5F5}.Prerelease|Win32.Build.0 = Release|Win32
+		{A4B68612-2BAF-45CE-9E01-C3D5B694F5F5}.Release|Win32.ActiveCfg = Release|Win32
+		{A4B68612-2BAF-45CE-9E01-C3D5B694F5F5}.Release|Win32.Build.0 = Release|Win32
+		{A4B68612-2BAF-45CE-9E01-C3D5B694F5F5}.Simulation|Win32.ActiveCfg = Release|Win32
+		{A4B68612-2BAF-45CE-9E01-C3D5B694F5F5}.Simulation|Win32.Build.0 = Release|Win32
+		{65DEA2D3-7DE1-4C70-A739-DDBCBFFF0BE4}.Debug|Win32.ActiveCfg = Debug|Win32
+		{65DEA2D3-7DE1-4C70-A739-DDBCBFFF0BE4}.Debug|Win32.Build.0 = Debug|Win32
+		{65DEA2D3-7DE1-4C70-A739-DDBCBFFF0BE4}.Prerelease|Win32.ActiveCfg = Prerelease|Win32
+		{65DEA2D3-7DE1-4C70-A739-DDBCBFFF0BE4}.Prerelease|Win32.Build.0 = Prerelease|Win32
+		{65DEA2D3-7DE1-4C70-A739-DDBCBFFF0BE4}.Release|Win32.ActiveCfg = Release|Win32
+		{65DEA2D3-7DE1-4C70-A739-DDBCBFFF0BE4}.Release|Win32.Build.0 = Release|Win32
+		{65DEA2D3-7DE1-4C70-A739-DDBCBFFF0BE4}.Simulation|Win32.ActiveCfg = Simulation|Win32
+		{65DEA2D3-7DE1-4C70-A739-DDBCBFFF0BE4}.Simulation|Win32.Build.0 = Simulation|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
