@@ -4,12 +4,36 @@
 #include "sgx_defs.h"
 #include "sgx_capable.h"
 #include "sgx_uae_service.h" // has sgx_enable_device method
+#include "sgx_tseal.h" // for sgx_sealed_data_t
+
+#include "SandboxEnclave_u.h" // for OCALL print
 #include "SandboxApplication.h"
 
 #include <ShlObj.h> // for SHGetFolderPathA used in getting path of launch token
 #include <iostream>
 
 using namespace std;
+
+struct sealed_buf_t sealedDataBuffer;
+
+//OCALL UTILITY: for printing out inside the enclave
+void print(const char *str) {
+	cout << str;
+}
+
+void releaseResources()
+{
+    for(int i = 0; i < BUF_NUM; i++)
+    {
+        if(sealedDataBuffer.sealed_buf_ptr[i] != NULL)
+        {
+            free(sealedDataBuffer.sealed_buf_ptr[i]);
+            sealedDataBuffer.sealed_buf_ptr[i] = NULL;
+        }
+    }
+    return;
+}
+
 
 /* placing this here makes it a global EID to be used by multiple threads. */
 /* this variable is a holder of the global EID to be assigned by sgx_create_enclave */
@@ -249,6 +273,15 @@ int createEnclave(void) {
 	return 0;
 }
 
+void releaseBufferResources() {
+	for (int i = 0; i < BUF_NUM; i++) {
+		if(sealedDataBuffer.sealed_buf_ptr[i] != NULL) {
+			free(sealedDataBuffer.sealed_buf_ptr[i]);
+			sealedDataBuffer.sealed_buf_ptr[i] = NULL;
+		}
+	}
+}
+
 int SGX_CDECL main(int argc, char *argv[])
 {
 	// FBDL 1: check the instruction status if SGX is enabled in the device.
@@ -264,6 +297,39 @@ int SGX_CDECL main(int argc, char *argv[])
 		getchar();
 		return -1;
 	}
+
+	// FBDL 3: initialize the data holder for the sealed data
+	cout << "Enclave created, initializing sealed data buffer" << endl;
+	uint32_t sealedBufferItemLen = sizeof(sgx_sealed_data_t) + sizeof(uint32_t);
+	for (int i = 0; i < BUF_NUM; i++)
+	{
+		//allocate memory for each buffer element that will be used later.
+		sealedDataBuffer.sealed_buf_ptr[i] = (uint8_t *)malloc(sealedBufferItemLen);
+		if(sealedDataBuffer.sealed_buf_ptr[i] == NULL) 
+		{
+			cout << "Out of Memory" << endl;
+			//do clearing of ALL resources
+			releaseBufferResources();
+			//then exit since there's no point in continuing anymore.
+			return -1;
+		}
+		//when an array index has been memory allocated, clean its contents
+		memset(sealedDataBuffer.sealed_buf_ptr[i], 0, sealedBufferItemLen);
+	}
+	sealedDataBuffer.index = 0;
+
+
+	// FBDL 4: Generate secret inside an enclave call and seal it
+	int result = 0;
+	enclave_generateRandomNumberAndSeal(globalEid, &result, &sealedDataBuffer);
+
+	// FBDL 5: Save the contents
+	cout << "printing muna dito sa labas" << endl;
+	printf("Outside: %d\n", sealedDataBuffer.sealed_buf_ptr[0]);
+	printf("Outside: %d\n", sealedDataBuffer.sealed_buf_ptr[1]);
+
+	cout << "Cleaning up" << endl;
+	releaseResources();
 
 	cout << "destroying enclave" << endl;
 	sgx_destroy_enclave(globalEid);
