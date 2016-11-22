@@ -1,5 +1,3 @@
-// SandboxApplication.cpp : Defines the entry point for the console application.
-
 #include "stdafx.h"
 #include "sgx_defs.h"
 #include "sgx_capable.h"
@@ -11,6 +9,7 @@
 
 #include <ShlObj.h> // for SHGetFolderPathA used in getting path of launch token
 #include <iostream>
+#include <io.h>
 
 using namespace std;
 
@@ -155,16 +154,14 @@ int querySgxStatus() {
 	
 	cout << "doing querySgxStatus" << endl;
 	sgx_device_status_t sgxDeviceStatus;
-	sgx_status_t sgxResult = sgx_enable_device(&sgxDeviceStatus); // sgx sdk provided method to do it.
+	sgx_status_t sgxResult = sgx_enable_device(&sgxDeviceStatus); // sgx-sdk-provided method to do it.
 
-	// all sgx methods has this status report, if it is successful or not
-	if (sgxResult != SGX_SUCCESS) {
+	if (sgxResult != SGX_SUCCESS) { // all sgx-methods has this status report, if it is successful or not
 		cout << "Failed to get the SGX device status! Exiting now..." << endl;
 		return -1;
 	}
 	else {
-	// in the case where sgx call has been successfully executed, check the resulting status
-		switch (sgxDeviceStatus) {
+		switch (sgxDeviceStatus) { // in the case where sgx call has been successfully executed, check the resulting status
 		case SGX_ENABLED:
 			cout << "SGX is already enabled!" << endl;
 			return 0;
@@ -201,7 +198,7 @@ int createEnclave(void) {
 
 	// FBDL 2.1: retrieving launch token saved by last transaction, else create new one.
 	// building tokenPath
-	if (S_OK != SHGetFolderPathA(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, tokenPath)) {
+	if (S_OK != SHGetFolderPathA(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, tokenPath)) { //TODO: use SHGetKnownFolderPath  instead
 		cout << "S_OK is not equal to SHGetFolderPathA result" << endl;
 		strncpy_s(tokenPath, _countof(tokenPath), TOKEN_FILENAME, sizeof(TOKEN_FILENAME));
 	} 
@@ -211,7 +208,6 @@ int createEnclave(void) {
 	}
 
 	//opening file token path, or create if non existent.
-	cout << "attempting to open file" << endl;
 	printf("token path is: %s", tokenPath);
 	HANDLE tokenHandler = CreateFileA(tokenPath, GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_ALWAYS, NULL, NULL);
 
@@ -234,7 +230,6 @@ int createEnclave(void) {
 	int debugFlag = 1; // 1 ON, 0 OFF
 	// NOTE: in project properties, we set Character Set to "Use Multi-Byte Character Set" from "use Unicode Character Set"
 	sgxResult = sgx_create_enclave(ENCLAVE_FILENAME, debugFlag, &launchToken, &isTokenUpdated, &globalEid, NULL);
-
 	if (sgxResult != SGX_SUCCESS) {
 		cout << "error occurred in sgx_create_enclave" << endl;
 		printErrorMessageFromSgxStatus(sgxResult);
@@ -246,7 +241,6 @@ int createEnclave(void) {
 	}
 
 	// FBDL 2.3: everything has been fine so save the launch token if it was updated.
-	cout << "checking if launch token is to be saved" << endl;
 	if (isTokenUpdated == FALSE || tokenHandler == INVALID_HANDLE_VALUE) {
 		cout << "token is not updated or file handler was invalid, no saving will occur" << endl;
 		if (tokenHandler != INVALID_HANDLE_VALUE)
@@ -254,7 +248,6 @@ int createEnclave(void) {
 		return 0;
 	}
 
-	cout << "Attempting saving" << endl;
 	//flushing file cache
 	FlushFileBuffers(tokenHandler);
 	//setting access offset back to begin of file
@@ -267,9 +260,6 @@ int createEnclave(void) {
 	if(writeNum != sizeof(sgx_launch_token_t))
 		cout << "WARNING: failed to save launch token" << endl;
 	CloseHandle(tokenHandler);
-
-	cout << "Launch token successfully stored" << endl;
-	printf("%s\n", tokenPath);
 	return 0;
 }
 
@@ -281,6 +271,45 @@ void releaseBufferResources() {
 		}
 	}
 }
+
+int file_exist (char *filename)
+{
+	if((_access(filename, 0)) != -1)
+		return 1;
+	else
+		return 0;
+}
+
+long loadFile(const char* path, unsigned char *buf) {
+
+	long dataLength;
+	FILE *f = fopen(path, "rb");
+	if (!f) {
+		return -1;
+	}
+	fseek(f, 0, SEEK_END);
+	dataLength = ftell(f);
+	fseek(f, 0, SEEK_SET);
+
+	unsigned char *buffer = new unsigned char[dataLength](); // alternative sa unsigned char buffer[length], kasi dapat si length ay const
+	fread(buffer, sizeof(unsigned char), dataLength, f);
+	fclose(f);
+
+	memcpy(buf, buffer, dataLength);
+	return dataLength;
+
+}
+
+int writeFile(char const *path, unsigned char *data, int length) {
+	FILE *f = fopen(path, "w");
+	int ret = fwrite(data, sizeof(unsigned char), length, f);
+	if (ret != length) {
+		printf("write_file error %d\n", ret);
+	}
+	fclose(f);
+	return 0;
+}
+
 
 int SGX_CDECL main(int argc, char *argv[])
 {
@@ -300,36 +329,71 @@ int SGX_CDECL main(int argc, char *argv[])
 
 	// FBDL 3: initialize the data holder for the sealed data
 	cout << "Enclave created, initializing sealed data buffer" << endl;
-	uint32_t sealedBufferItemLen = sizeof(sgx_sealed_data_t) + sizeof(uint32_t);
-	for (int i = 0; i < BUF_NUM; i++)
-	{
-		//allocate memory for each buffer element that will be used later.
-		sealedDataBuffer.sealed_buf_ptr[i] = (uint8_t *)malloc(sealedBufferItemLen);
-		if(sealedDataBuffer.sealed_buf_ptr[i] == NULL) 
-		{
-			cout << "Out of Memory" << endl;
-			//do clearing of ALL resources
-			releaseBufferResources();
-			//then exit since there's no point in continuing anymore.
+	const int SEALED_BLOB_MAX = 1024;
+	sgx_status_t res = SGX_SUCCESS;
+	uint32_t err;
+	unsigned char blob[SEALED_BLOB_MAX] = {0};
+	unsigned char sealedBlob[SEALED_BLOB_MAX] = {0};
+	int blobLen, sealLen;
+	sealLen = 0;
+	blobLen = SEALED_BLOB_MAX;
+
+	if(file_exist("fbdl.dat")) {
+		cout << "file exists doing unsealing" << endl;
+		
+		// FBDL 4a: load file contents, and extract sealed contents
+		long length = loadFile("fbdl.dat", sealedBlob);
+		if(length == -1) {
+			cout << "ERR: loading file error... exiting now" << endl;
+			sgx_destroy_enclave(globalEid);
 			return -1;
 		}
-		//when an array index has been memory allocated, clean its contents
-		memset(sealedDataBuffer.sealed_buf_ptr[i], 0, sealedBufferItemLen);
+		sealLen = length;
+		cout << "loading successful" << endl;
+
+		cout << "contents of sealedBlob from file" << endl;
+		for (int i = 0; i < sealLen; i++)
+			printf("%d", sealedBlob[i]);
+		cout << endl;
+
+		// FBDL 5a: feed the extracted sealed data unto the enclave for unsealing.
+		cout << "sealLen value: " << sealLen << endl;
+		res = enclave_UnsealBlob(globalEid, &err, sealedBlob, blobLen, &sealLen);
+		if (res != SGX_SUCCESS) {
+			cout << "unsealing failed" << endl;
+			sgx_destroy_enclave(globalEid);
+			return -1;
+		}
 	}
-	sealedDataBuffer.index = 0;
+	else {
+		cout << "file doesn't exist, creating enclave and secrets from scratch" << endl;
+		
+		res = enclave_generateAndSealBlob(globalEid, &err, blob, blobLen, &sealLen);
+		if (res != SGX_SUCCESS) {
+			cout << "enclave experiment failed" << endl;
+			sgx_destroy_enclave(globalEid);
+			return -1;
+		}
 
+		cout << "sealing done, preparing for save to file" << endl;
+		memcpy(sealedBlob, blob, sealLen);
 
-	// FBDL 4: Generate secret inside an enclave call and seal it
-	int result = 0;
-	enclave_generateRandomNumberAndSeal(globalEid, &result, &sealedDataBuffer);
+		cout << "contents of blob" << endl;
+		for (int i = 0; i < sealLen; i++) {
+			printf("%d", blob[i]);
+		}
+		cout << endl;
+		cout << "contents of sealedBlob" << endl;
+		for (int i = 0; i < sealLen; i++) {
+			printf("%d", sealedBlob[i]);
+		}
+		cout << endl;
 
-	// FBDL 5: Save the contents
-	cout << "printing muna dito sa labas" << endl;
-	printf("Outside: %d\n", sealedDataBuffer.sealed_buf_ptr[0]);
-	printf("Outside: %d\n", sealedDataBuffer.sealed_buf_ptr[1]);
+		cout << "attempting to save" << endl;
+		if(writeFile("fbdl.dat", sealedBlob, sealLen))
+			cout << "WARN: error occurred in saving, sealed data not saved" << endl;
+	}
 
-	cout << "Cleaning up" << endl;
-	releaseResources();
 
 	cout << "destroying enclave" << endl;
 	sgx_destroy_enclave(globalEid);
