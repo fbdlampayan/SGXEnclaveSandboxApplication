@@ -368,6 +368,7 @@ int SGX_CDECL main(int argc, char *argv[])
 	else {
 		cout << "file doesn't exist, creating enclave and secrets from scratch" << endl;
 		
+		// FBDL 4b: generate secret and seal data while within the enclave
 		res = enclave_generateAndSealBlob(globalEid, &err, blob, blobLen, &sealLen);
 		if (res != SGX_SUCCESS) {
 			cout << "enclave experiment failed" << endl;
@@ -389,6 +390,7 @@ int SGX_CDECL main(int argc, char *argv[])
 		}
 		cout << endl;
 
+		// FBDL 5b: save to file
 		cout << "attempting to save" << endl;
 		if(writeFile("fbdl.dat", sealedBlob, sealLen))
 			cout << "WARN: error occurred in saving, sealed data not saved" << endl;
